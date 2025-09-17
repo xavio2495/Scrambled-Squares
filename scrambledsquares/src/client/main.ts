@@ -1,93 +1,97 @@
-import {
-  IncrementResponse,
-  DecrementResponse,
-  InitResponse,
-} from "../shared/types/api";
-import { navigateTo } from "@devvit/web/client";
+import { GameGrid, GameState } from "../shared/types/api";
+import { PreGame } from "./components/PreGame";
+import { GameBoard } from "./components/GameBoard";
+import { PostGame } from "./components/PostGame";
 
-const counterValueElement = document.getElementById(
-  "counter-value"
-) as HTMLSpanElement;
-const incrementButton = document.getElementById(
-  "increment-button"
-) as HTMLButtonElement;
-const decrementButton = document.getElementById(
-  "decrement-button"
-) as HTMLButtonElement;
+class GameManager {
+  private container: HTMLElement;
+  private gameState: GameState | null = null;
+  private currentComponent: PreGame | GameBoard | PostGame | null = null;
 
-const docsLink = document.getElementById("docs-link") as HTMLDivElement;
-const playtestLink = document.getElementById("playtest-link") as HTMLDivElement;
-const discordLink = document.getElementById("discord-link") as HTMLDivElement;
-
-docsLink.addEventListener("click", () => {
-  navigateTo("https://developers.reddit.com/docs");
-});
-
-playtestLink.addEventListener("click", () => {
-  navigateTo("https://www.reddit.com/r/Devvit");
-});
-
-discordLink.addEventListener("click", () => {
-  navigateTo("https://discord.com/invite/R7yu2wh9Qz");
-});
-
-const titleElement = document.getElementById("title") as HTMLHeadingElement;
-
-let currentPostId: string | null = null;
-
-async function fetchInitialCount() {
-  try {
-    const response = await fetch("/api/init");
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  constructor() {
+    this.container = document.getElementById("game-container") as HTMLElement;
+    if (!this.container) {
+      throw new Error("Game container not found");
     }
-    const data = (await response.json()) as InitResponse;
-    if (data.type === "init") {
-      counterValueElement.textContent = data.count.toString();
-      currentPostId = data.postId; // Store postId for later use
-      titleElement.textContent = `Hey ${data.username} 👋`;
-    } else {
-      console.error("Invalid response type from /api/init", data);
-      counterValueElement.textContent = "Error";
-    }
-  } catch (error) {
-    console.error("Error fetching initial count:", error);
-    counterValueElement.textContent = "Error";
-  }
-}
-
-async function updateCounter(action: "increment" | "decrement") {
-  if (!currentPostId) {
-    console.error("Cannot update counter: postId is not initialized.");
-    // Optionally, you could try to re-initialize or show an error to the user.
-    return;
+    this.initialize();
   }
 
-  try {
-    const response = await fetch(`/api/${action}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      // The body can be an empty JSON object or include the postId if your backend expects it,
-      // but based on your server code, postId is taken from req.devvit.
-      body: JSON.stringify({}),
+  private async initialize() {
+    try {
+      // Fetch daily grid
+      const response = await fetch("/api/daily-grid");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const gridData = await response.json() as GameGrid;
+      
+      // Start with PreGame component
+      this.showPreGame(gridData);
+    } catch (error) {
+      console.error("Failed to initialize game:", error);
+      this.showError("Failed to load game. Please try again later.");
+    }
+  }
+
+  private showPreGame(gridData: GameGrid) {
+    const preGame = new PreGame(gridData);
+    this.replaceComponent(preGame);
+
+    // Handle game start
+    preGame.onStart(() => {
+      this.startGame(gridData);
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  private startGame(gridData: GameGrid) {
+    const gameBoard = new GameBoard(gridData);
+    this.replaceComponent(gameBoard);
+
+    // Start the timer
+    gameBoard.startTimer(() => {
+      this.endGame(gameBoard.getScore(), gameBoard.getFoundWords());
+    });
+  }
+
+  private endGame(score: number, foundWords: string[]) {
+    const postGame = new PostGame({
+      score,
+      foundWords,
+      dailyId: this.gameState?.dailyId || '',
+      timeElapsed: 60
+    });
+    this.replaceComponent(postGame);
+  }
+
+  private replaceComponent(component: PreGame | GameBoard | PostGame) {
+    // Remove old component if exists
+    if (this.currentComponent) {
+      this.container.removeChild(this.currentComponent.render());
     }
-    const data = (await response.json()) as
-      | IncrementResponse
-      | DecrementResponse;
-    counterValueElement.textContent = data.count.toString();
-  } catch (error) {
-    console.error(`Error ${action}ing count:`, error);
-    // Optionally, display an error message to the user in the UI
+
+    // Add new component
+    this.currentComponent = component;
+    this.container.appendChild(component.render());
+  }
+
+  private showError(message: string) {
+    this.container.innerHTML = `
+      <div class="error-container">
+        <div class="error-message">${message}</div>
+        <button onclick="window.location.reload()">Try Again</button>
+      </div>
+    `;
   }
 }
 
-incrementButton.addEventListener("click", () => updateCounter("increment"));
-decrementButton.addEventListener("click", () => updateCounter("decrement"));
-
-// Fetch the initial count when the page loads
-fetchInitialCount();
+// Initialize game manager
+try {
+  new GameManager();
+} catch (error) {
+  console.error('Failed to start game:', error);
+  document.body.innerHTML = `
+    <div class="error-container">
+      <div class="error-message">Failed to start game. Please refresh the page.</div>
+    </div>
+  `;
+}
