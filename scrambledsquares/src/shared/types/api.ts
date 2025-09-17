@@ -16,3 +16,16 @@ export type DecrementResponse = {
   postId: string;
   count: number;
 };
+
+// shared/types/puzzle.ts
+export interface Clue {
+  clue: string;
+  answer: string;
+  found: boolean;
+};
+
+export interface Puzzle {
+  theme: string;
+  grid: string[][];
+  clues: Clue[];
+};
