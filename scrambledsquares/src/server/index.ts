@@ -1,13 +1,5 @@
 import express from "express";
-import {
-  GameState,
-  GameGrid,
-  ValidateWordRequest,
-  ValidateWordResponse,
-  DailyLeaderboard,
-  GameError,
-  GridPosition
-} from "../shared/types/api";
+import { GridPosition } from "../shared/types/api";
 import {
   createServer,
   context,
@@ -17,7 +9,7 @@ import {
 import { createPost } from "./core/post";
 import { DictionaryService } from "./core/dictionary";
 import { GameStorage } from "./core/storage";
-import { GridGenerator } from "./core/grid";
+import { GridGenerator } from "./core/grid.js";
 
 const app = express();
 

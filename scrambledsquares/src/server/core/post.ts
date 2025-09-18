@@ -1,6 +1,6 @@
 import { reddit, context } from "@devvit/web/server";
 import { GameStorage } from "./storage";
-import { GridGenerator } from "./grid";
+import { GridGenerator } from "./grid.js";
 
 export const createPost = async () => {
   const { subredditName } = context;

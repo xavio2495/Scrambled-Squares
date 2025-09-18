@@ -1,0 +1,629 @@
+import { readFile } from 'fs/promises';import { readFile } from 'fs/promises';
+
+import { join } from 'path';import { join } from 'path';
+
+import { GameStorage } from './storage';import { GameStorage } from './storage';
+
+import { GameGrid } from '../../shared/types/api';
+
+// Constants for grid generation
+
+// Constants for grid generationconst GRID_SIZE = 4;
+
+const GRID_SIZE = 4;const VOWELS = ['A', 'E', 'I', 'O', 'U'] as const;
+
+const VOWELS = ['A', 'E', 'I', 'O', 'U'] as const;const CONSONANTS = [
+
+const CONSONANTS = [    'B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M',
+
+    'B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M',    'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Y', 'Z'
+
+    'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Y', 'Z'] as const;
+
+] as const;const MIN_VOWELS = 4;
+
+const MIN_VOWELS = 4;const MIN_CONSONANTS = 8;
+
+const MIN_CONSONANTS = 8;
+
+type Letter = typeof VOWELS[number] | typeof CONSONANTS[number];
+
+type Letter = typeof VOWELS[number] | typeof CONSONANTS[number];
+
+// Common letter frequencies in English words
+
+// Common letter frequencies in English wordsconst LETTER_FREQUENCIES: Record<Letter, number> = {
+
+const LETTER_FREQUENCIES: Record<Letter, number> = {    'A': 8.2, 'B': 1.5, 'C': 2.8, 'D': 4.3, 'E': 13, 'F': 2.2, 'G': 2.0, 'H': 6.1,
+
+    'A': 8.2, 'B': 1.5, 'C': 2.8, 'D': 4.3, 'E': 13, 'F': 2.2, 'G': 2.0, 'H': 6.1,    'I': 7.0, 'J': 0.15, 'K': 0.77, 'L': 4.0, 'M': 2.4, 'N': 6.7, 'O': 7.5, 'P': 1.9,
+
+    'I': 7.0, 'J': 0.15, 'K': 0.77, 'L': 4.0, 'M': 2.4, 'N': 6.7, 'O': 7.5, 'P': 1.9,    'Q': 0.095, 'R': 6.0, 'S': 6.3, 'T': 9.1, 'U': 2.8, 'V': 0.98, 'W': 2.4, 'X': 0.15,
+
+    'Q': 0.095, 'R': 6.0, 'S': 6.3, 'T': 9.1, 'U': 2.8, 'V': 0.98, 'W': 2.4, 'X': 0.15,    'Y': 2.0, 'Z': 0.074
+
+    'Y': 2.0, 'Z': 0.074};
+
+};
+
+export class GridGenerator {
+
+export class GridGenerator {    private static scrabbleWords: Set<string>;
+
+    private static scrabbleWords: Set<string>;
+
+    /**
+
+    /**     * Initialize the dictionary from a file
+
+     * Initialize the dictionary from a file     */
+
+     */    static async initialize(): Promise<void> {
+
+    static async initialize(): Promise<void> {        try {
+
+        try {            // Load official Scrabble word list
+
+            // Load official Scrabble word list            const scrabbleData = await readFile(join(__dirname, '../../../data/scrabble.txt'), 'utf-8');
+
+            const scrabbleData = await readFile(join(__dirname, '../../../data/scrabble.txt'), 'utf-8');            this.scrabbleWords = new Set(scrabbleData.split('\n').map(word => word.trim().toUpperCase()));
+
+            this.scrabbleWords = new Set(scrabbleData.split('\n').map(word => word.trim().toUpperCase()));        } catch (error) {
+
+        } catch (error) {            console.error('Failed to load dictionary:', error);
+
+            console.error('Failed to load dictionary:', error);            throw new Error('Dictionary initialization failed');
+
+            throw new Error('Dictionary initialization failed');        }
+
+        }    }
+
+    }
+
+    /**
+
+    /**     * Generate a new daily grid with a good distribution of letters
+
+     * Generate a new daily grid with a good distribution of letters     */
+
+     */    static generateGrid(): Letter[][] {
+
+    static generateGrid(): Letter[][] {        // Initialize empty grid
+
+        // Initialize empty grid with explicit typing        const grid: Letter[][] = Array.from({ length: GRID_SIZE }, 
+
+        const grid: Letter[][] = Array.from({ length: GRID_SIZE },             () => Array(GRID_SIZE).fill('A' as Letter)
+
+            () => Array.from<Letter>({ length: GRID_SIZE }).fill('A' as Letter)        );
+
+        );
+
+        const letters = this.generateBalancedLetterSet();
+
+        const letters = this.generateBalancedLetterSet();        this.placeLettersInGrid(letters, grid);
+
+        this.placeLettersInGrid(letters, grid);        return grid;
+
+        return grid;    }
+
+    }
+
+    /**
+
+    /**     * Generate a balanced set of letters for the grid
+
+     * Generate a balanced set of letters for the grid     */
+
+     */    private static generateBalancedLetterSet(): Letter[] {
+
+    private static generateBalancedLetterSet(): Letter[] {        const letters: Letter[] = [];
+
+        const letters: Letter[] = [];        
+
+                // Track letter distributions
+
+        // Track letter distributions        const vowelDist = new Map(VOWELS.map(v => [v, LETTER_FREQUENCIES[v]]));
+
+        const vowelDist = new Map(VOWELS.map(v => [v, LETTER_FREQUENCIES[v]]));        const consDist = new Map(CONSONANTS.map(c => [c, LETTER_FREQUENCIES[c]]));
+
+        const consDist = new Map(CONSONANTS.map(c => [c, LETTER_FREQUENCIES[c]]));        
+
+                // Add minimum vowels
+
+        // Add minimum vowels        for (let i = 0; i < MIN_VOWELS; i++) {
+
+        for (let i = 0; i < MIN_VOWELS; i++) {            const vowel = this.weightedRandomChoice(
+
+            const vowel = this.weightedRandomChoice(                Array.from(vowelDist.keys()),
+
+                Array.from(vowelDist.keys()),                letter => vowelDist.get(letter) || 0
+
+                letter => vowelDist.get(letter) || 0            );
+
+            );            letters.push(vowel);
+
+            letters.push(vowel);            vowelDist.set(vowel, (vowelDist.get(vowel) || 0) * 0.5);
+
+            vowelDist.set(vowel, (vowelDist.get(vowel) || 0) * 0.5);        }
+
+        }        
+
+                // Add minimum consonants
+
+        // Add minimum consonants        for (let i = 0; i < MIN_CONSONANTS; i++) {
+
+        for (let i = 0; i < MIN_CONSONANTS; i++) {            const cons = this.weightedRandomChoice(
+
+            const cons = this.weightedRandomChoice(                Array.from(consDist.keys()),
+
+                Array.from(consDist.keys()),                letter => consDist.get(letter) || 0
+
+                letter => consDist.get(letter) || 0            );
+
+            );            letters.push(cons);
+
+            letters.push(cons);            consDist.set(cons, (consDist.get(cons) || 0) * 0.5);
+
+            consDist.set(cons, (consDist.get(cons) || 0) * 0.5);        }
+
+        }        
+
+                // Fill remaining spots
+
+        // Fill remaining spots        const remaining = (GRID_SIZE * GRID_SIZE) - letters.length;
+
+        const remaining = (GRID_SIZE * GRID_SIZE) - letters.length;        const allDist = new Map([...vowelDist, ...consDist]);
+
+        const allDist = new Map([...vowelDist, ...consDist]);        
+
+                for (let i = 0; i < remaining; i++) {
+
+        for (let i = 0; i < remaining; i++) {            const letter = this.weightedRandomChoice(
+
+            const letter = this.weightedRandomChoice(                Array.from(allDist.keys()),
+
+                Array.from(allDist.keys()),                letter => allDist.get(letter) || 0
+
+                letter => allDist.get(letter) || 0            );
+
+            );            letters.push(letter);
+
+            letters.push(letter);            allDist.set(letter, (allDist.get(letter) || 0) * 0.7);
+
+            allDist.set(letter, (allDist.get(letter) || 0) * 0.7);        }
+
+        }        
+
+                return letters;
+
+        return letters;    }
+
+    }
+
+    /**
+
+    /**     * Place letters in the grid while avoiding adjacent duplicates
+
+     * Place letters in the grid while avoiding adjacent duplicates     */
+
+     */    private static placeLettersInGrid(letters: Letter[], grid: Letter[][]): void {
+
+    private static placeLettersInGrid(letters: Letter[], grid: Letter[][]): void {        let attempts = 0;
+
+        let attempts = 0;        const maxAttempts = 10;
+
+        const maxAttempts = 10;
+
+        do {
+
+        do {            this.shuffleArray(letters);
+
+            this.shuffleArray(letters);            attempts++;
+
+            attempts++;
+
+            // Try current arrangement
+
+            // Try current arrangement            let validPlacement = true;
+
+            let validPlacement = true;            for (let i = 0; i < GRID_SIZE && validPlacement; i++) {
+
+            for (let i = 0; i < GRID_SIZE && validPlacement; i++) {                for (let j = 0; j < GRID_SIZE && validPlacement; j++) {
+
+                const row = grid[i];                    const index = i * GRID_SIZE + j;
+
+                if (!row) continue;                    if (index < letters.length) {
+
+                        const letter = letters[index];
+
+                for (let j = 0; j < GRID_SIZE && validPlacement; j++) {                        
+
+                    const index = i * GRID_SIZE + j;                        if (this.isValidPlacement(grid, i, j, letter)) {
+
+                    if (index < letters.length) {                            grid[i][j] = letter;
+
+                        const letter = letters[index];                        } else {
+
+                                                    validPlacement = false;
+
+                        if (this.isValidPlacement(grid, i, j, letter)) {                        }
+
+                            row[j] = letter;                    }
+
+                        } else {                }
+
+                            validPlacement = false;            }
+
+                        }
+
+                    }            if (validPlacement) {
+
+                }                break;
+
+            }            }
+
+
+
+            if (validPlacement) {            // Reset grid if placement was invalid
+
+                break;            for (let i = 0; i < GRID_SIZE; i++) {
+
+            }                grid[i].fill('A' as Letter);
+
+            }
+
+            // Reset grid if placement was invalid        } while (attempts < maxAttempts);
+
+            for (let i = 0; i < GRID_SIZE; i++) {
+
+                const row = grid[i];        // If we couldn't generate a valid grid after max attempts,
+
+                if (row) {        // try generating a new set of letters
+
+                    for (let j = 0; j < GRID_SIZE; j++) {        if (attempts >= maxAttempts) {
+
+                        row[j] = 'A' as Letter;            const newLetters = this.generateBalancedLetterSet();
+
+                    }            this.placeLettersInGrid(newLetters, grid);
+
+                }        }
+
+            }    }
+
+        } while (attempts < maxAttempts);
+
+    /**
+
+        // If we couldn't generate a valid grid after max attempts,     * Check if placing a letter at the given position is valid
+
+        // try generating a new set of letters     */
+
+        if (attempts >= maxAttempts) {    private static isValidPlacement(
+
+            const newLetters = this.generateBalancedLetterSet();        grid: Letter[][], 
+
+            this.placeLettersInGrid(newLetters, grid);        row: number, 
+
+        }        col: number, 
+
+    }        letter: Letter
+
+    ): boolean {
+
+    /**        // Check horizontal triplets
+
+     * Check if placing a letter at the given position is valid        if (col >= 2 && 
+
+     */            grid[row][col-2] === letter && 
+
+    private static isValidPlacement(            grid[row][col-1] === letter) {
+
+        grid: Letter[][],             return false;
+
+        row: number,         }
+
+        col: number,         
+
+        letter: Letter        // Check vertical triplets
+
+    ): boolean {        if (row >= 2 && 
+
+        const currentRow = grid[row];            grid[row-2][col] === letter && 
+
+        if (!currentRow) return false;            grid[row-1][col] === letter) {
+
+            return false;
+
+        // Check horizontal triplets        }
+
+        if (col >= 2) {        
+
+            const leftTwo = currentRow[col-2];        return true;
+
+            const leftOne = currentRow[col-1];    }
+
+            if (leftTwo === letter && leftOne === letter) {
+
+                return false;    /**
+
+            }     * Find all valid words in a given grid
+
+        }     */
+
+            static findValidWords(grid: Letter[][]): Set<string> {
+
+        // Check vertical triplets        const validWords = new Set<string>();
+
+        if (row >= 2) {        const visited = Array(GRID_SIZE).fill(null)
+
+            const upTwo = grid[row-2]?.[col];            .map(() => Array(GRID_SIZE).fill(false));
+
+            const upOne = grid[row-1]?.[col];
+
+            if (upTwo === letter && upOne === letter) {        // Try starting from each cell
+
+                return false;        for (let row = 0; row < GRID_SIZE; row++) {
+
+            }            for (let col = 0; col < GRID_SIZE; col++) {
+
+        }                this.findWordsFromCell(grid, row, col, '', visited, validWords);
+
+                    }
+
+        return true;        }
+
+    }
+
+        return validWords;
+
+    /**    }
+
+     * Find all valid words in a given grid
+
+     */    /**
+
+    static findValidWords(grid: Letter[][]): Set<string> {     * Check if a word exists in the Scrabble dictionary
+
+        const validWords = new Set<string>();     */
+
+        const visited = Array.from({ length: GRID_SIZE },     static isValidWord(word: string): boolean {
+
+            () => Array.from({ length: GRID_SIZE }).fill(false)        return this.scrabbleWords.has(word.toUpperCase());
+
+        );    }
+
+
+
+        // Try starting from each cell    /**
+
+        for (let row = 0; row < GRID_SIZE; row++) {     * Generate a new daily puzzle and store it in Redis
+
+            for (let col = 0; col < GRID_SIZE; col++) {     */
+
+                this.findWordsFromCell(grid, row, col, '', visited, validWords);    static async generateDailyPuzzle(): Promise<void> {
+
+            }        const grid = this.generateGrid();
+
+        }        const validWords = this.findValidWords(grid);
+
+
+
+        return validWords;        // Regenerate if too few valid words
+
+    }        if (validWords.size < 10) {
+
+            return this.generateDailyPuzzle();
+
+    /**        }
+
+     * Check if a word exists in the Scrabble dictionary
+
+     */        // Store in Redis
+
+    static isValidWord(word: string): boolean {        await GameStorage.resetDailyData();
+
+        return this.scrabbleWords.has(word.toUpperCase());        await Promise.all([
+
+    }            GameStorage.setDailyGrid(grid),
+
+            GameStorage.setDailyWords(validWords)
+
+    /**        ]);
+
+     * Generate a new daily puzzle and store it in Redis    }
+
+     */
+
+    static async generateDailyPuzzle(): Promise<void> {    private static findWordsFromCell(
+
+        const letters = this.generateGrid();        grid: Letter[][],
+
+        const validWords = this.findValidWords(letters);        row: number,
+
+        col: number,
+
+        // Regenerate if too few valid words        currentWord: string,
+
+        if (validWords.size < 10) {        visited: boolean[][],
+
+            return this.generateDailyPuzzle();        validWords: Set<string>
+
+        }    ): void {
+
+        // Check bounds and visited state
+
+        const today = new Date().toISOString().split('T')[0];        if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE ||
+
+        const gridData: GameGrid = {            !visited[row] || visited[row][col] === undefined) {
+
+            grid: letters,            return;
+
+            dailyId: today,        }
+
+            date: today
+
+        };        const cell = grid[row][col];
+
+        if (!cell) {
+
+        // Store in Redis            return;
+
+        await GameStorage.resetDailyData();        }
+
+        await Promise.all([
+
+            GameStorage.setDailyGrid(gridData),        // Mark current cell as visited
+
+            GameStorage.setDailyWords(validWords)        visited[row][col] = true;
+
+        ]);        currentWord += cell;
+
+    }
+
+        // Check if current word is valid (minimum 3 letters)
+
+    private static findWordsFromCell(        if (currentWord.length >= 3 && this.isValidWord(currentWord)) {
+
+        grid: Letter[][],            validWords.add(currentWord);
+
+        row: number,        }
+
+        col: number,
+
+        currentWord: string,        // Check all adjacent cells
+
+        visited: boolean[][],        for (let i = -1; i <= 1; i++) {
+
+        validWords: Set<string>            for (let j = -1; j <= 1; j++) {
+
+    ): void {                if (i === 0 && j === 0) continue;
+
+        // Check bounds and visited state                
+
+        if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) {                const newRow = row + i;
+
+            return;                const newCol = col + j;
+
+        }
+
+                if (newRow >= 0 && newRow < GRID_SIZE &&
+
+        const currentRow = grid[row];                    newCol >= 0 && newCol < GRID_SIZE &&
+
+        const visitedRow = visited[row];                    visited[newRow] &&
+
+        if (!currentRow || !visitedRow) {                    !visited[newRow][newCol]) {
+
+            return;                    this.findWordsFromCell(grid, newRow, newCol, currentWord, visited, validWords);
+
+        }                }
+
+            }
+
+        const cell = currentRow[col];        }
+
+        if (visitedRow[col] || !cell) {
+
+            return;        // Backtrack
+
+        }        visited[row][col] = false;
+
+    }
+
+        // Mark current cell as visited
+
+        visitedRow[col] = true;    private static weightedRandomChoice<T extends Letter>(
+
+        currentWord += cell;        items: readonly T[],
+
+        weightFn: (item: T) => number
+
+        // Check if current word is valid (minimum 3 letters)    ): T {
+
+        if (currentWord.length >= 3 && this.isValidWord(currentWord)) {        const weights = items.map(weightFn);
+
+            validWords.add(currentWord);        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+
+        }        let random = Math.random() * totalWeight;
+
+        
+
+        // Check all adjacent cells        for (let i = 0; i < items.length; i++) {
+
+        for (let i = -1; i <= 1; i++) {            const weight = weights[i] ?? 0;
+
+            for (let j = -1; j <= 1; j++) {            random -= weight;
+
+                if (i === 0 && j === 0) continue;            if (random <= 0) {
+
+                                return items[i];
+
+                const newRow = row + i;            }
+
+                const newCol = col + j;        }
+
+        
+
+                if (newRow >= 0 && newRow < GRID_SIZE &&        return items[items.length - 1];
+
+                    newCol >= 0 && newCol < GRID_SIZE) {    }
+
+                    const newVisitedRow = visited[newRow];
+
+                    if (newVisitedRow &&    private static shuffleArray<T>(array: T[]): void {
+
+                        grid[newRow]?.[newCol] &&        for (let i = array.length - 1; i > 0; i--) {
+
+                        !newVisitedRow[newCol]) {            const j = Math.floor(Math.random() * (i + 1));
+
+                        this.findWordsFromCell(grid, newRow, newCol, currentWord, visited, validWords);            [array[i], array[j]] = [array[j] as T, array[i] as T];
+
+                    }        }
+
+                }    }
+
+            }}
+        }
+
+        // Backtrack
+        visitedRow[col] = false;
+    }
+
+    private static weightedRandomChoice<T extends Letter>(
+        items: readonly T[],
+        weightFn: (item: T) => number
+    ): T {
+        if (items.length === 0) {
+            throw new Error('Cannot make a choice from an empty array');
+        }
+
+        const weights = items.map(weightFn);
+        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+        let random = Math.random() * totalWeight;
+        
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (!item) continue;
+
+            const weight = weights[i] ?? 0;
+            random -= weight;
+            if (random <= 0) {
+                return item;
+            }
+        }
+        
+        // Fallback to last item (should never happen with proper weights)
+        const lastItem = items[items.length - 1];
+        if (!lastItem) {
+            throw new Error('No valid item found');
+        }
+        return lastItem;
+    }
+
+    private static shuffleArray<T>(array: T[]): void {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j] as T, array[i] as T];
+        }
+    }
+}

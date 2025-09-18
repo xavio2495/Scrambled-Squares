@@ -164,15 +164,6 @@ export class GameStorage {
             }
         }
         
-        for (const member of members) {
-            if (typeof member === 'string') {
-                const score = await redis.zScore(KEYS.LEADERBOARD, member);
-                if (typeof score === 'number') {
-                    results.push({ username: member, score });
-                }
-            }
-        }
-        
         return results;
     }
 
