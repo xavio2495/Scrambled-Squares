@@ -3,20 +3,27 @@ import { builtinModules } from "node:module";
 
 export default defineConfig({
   ssr: {
-    noExternal: true,
+    noExternal: ['@devvit/*'],
   },
   build: {
     emptyOutDir: false,
     ssr: "index.ts",
     outDir: "../../dist/server",
     target: "node22",
-    sourcemap: true,
+    sourcemap: false,
+    minify: true,
     rollupOptions: {
-      external: [...builtinModules],
+      external: [
+        ...builtinModules,
+        /^@devvit\//,
+        'express',
+        'cors',
+        'body-parser'
+      ],
       output: {
-        format: "cjs",
-        entryFileNames: "index.cjs",
-        inlineDynamicImports: true,
+        format: "esm",
+        entryFileNames: "index.mjs",
+        inlineDynamicImports: false,
       },
     },
   },

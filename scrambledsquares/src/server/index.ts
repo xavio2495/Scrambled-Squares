@@ -10,13 +10,33 @@ import { createPost } from "./core/post";
 import { DictionaryService } from "./core/dictionary";
 import { GameStorage } from "./core/storage";
 import { GridGenerator } from "./core/grid.js";
+import { onAppInstall } from "./routes/on-app-install.js";
+import { generateDaily } from "./routes/generate-daily.js";
+import { createPost as handlePostCreate } from "./routes/post-create.js";
 
 const app = express();
+const router = express.Router();
 
 // Middleware setup
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text());
+
+// Internal routes
+router.post("/internal/on-app-install", onAppInstall);
+router.post("/internal/schedule/generate-daily", generateDaily);
+router.post("/internal/menu/post-create", handlePostCreate);
+
+// Use the router
+app.use(router);
+
+// Initialize services using proper error handling
+import { initializeServices } from './core/init';
+
+initializeServices().catch(error => {
+    console.error('Failed to initialize services:', error);
+    // Don't exit - let Devvit handle the error
+});
 
 // Error Handling
 interface AppError {
@@ -34,8 +54,6 @@ function createError(
 ): AppError {
   return { code, message, status, details };
 }
-
-const router = express.Router();
 
 // Rate limiting
 type RateInfo = { count: number; firstRequest: number };

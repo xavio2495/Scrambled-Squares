@@ -2,36 +2,19 @@
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
   "name": "scrambledsquares",
   "description": "A daily word hunt game - find words in a 4x4 grid before time runs out!",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "author": "xavio2495",
   "post": {
     "dir": "dist/client",
     "entrypoints": {
       "default": {
-        "entry": "index.html",
-        "height": "tall"
+        "entry": "index.html"
       }
     }
   },
   "server": {
     "dir": "dist/server",
     "entry": "index.mjs"
-  },
-  "permissions": {
-    "http": {
-      "enable": true
-    },
-    "media": false,
-    "payments": false,
-    "realtime": false,
-    "redis": true,
-    "reddit": {
-      "enable": true,
-      "asUser": ["SUBMIT_POST", "SUBMIT_COMMENT"]
-    }
-  },
-  "triggers": {
-    "onAppInstall": "/internal/on-app-install"
   },
   "menu": {
     "items": [
@@ -44,7 +27,24 @@
       }
     ]
   },
-  "scheduler": {
-    "tasks": {}
+  "appPermissions": [
+    "readPost",
+    "modifyPost",
+    "submitPost",
+    "managePost",
+    "readUserInfo",
+    "structuredStyles"
+  ],
+  "api": {
+    "/internal/menu/post-create": {
+      "method": "POST"
+    },
+    "/internal/on-app-install": {
+      "method": "POST",
+      "event": "onAppInstall"
+    },
+    "/internal/schedule/generate-daily": {
+      "method": "POST",
+      "schedule": "0 0 * * *"
+    }
   }
-}

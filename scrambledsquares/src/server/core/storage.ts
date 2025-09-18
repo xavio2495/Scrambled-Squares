@@ -17,6 +17,21 @@ const ONE_DAY = 86400;
  */
 export class GameStorage {
     /**
+     * Verify Redis connection is working
+     */
+    static async verifyConnection(): Promise<void> {
+        try {
+            // Try to set and get a test value
+            await redis.set('test:connection', 'ok');
+            await redis.get('test:connection');
+            await redis.del('test:connection');
+        } catch (error) {
+            console.error('Redis connection failed:', error);
+            throw new Error('Redis connection failed');
+        }
+    }
+
+    /**
      * Get the current date in YYYY-MM-DD format for keys
      */
     private static getCurrentDateKey(): string {
