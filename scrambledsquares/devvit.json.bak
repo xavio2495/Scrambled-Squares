@@ -1,0 +1,50 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "scrambledsquares",
+  "description": "A daily word hunt game - find words in a 4x4 grid before time runs out!",
+  "version": "1.0.0",
+  "author": "xavio2495",
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "entry": "index.html"
+      }
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.mjs"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Create Daily Game",
+        "description": "Create a new daily Scrambled Squares game post",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-create"
+      }
+    ]
+  },
+  "appPermissions": [
+    "readPost",
+    "modifyPost",
+    "submitPost",
+    "managePost",
+    "readUserInfo",
+    "structuredStyles"
+  ],
+  "api": {
+    "/internal/menu/post-create": {
+      "method": "POST"
+    },
+    "/internal/on-app-install": {
+      "method": "POST",
+      "event": "onAppInstall"
+    },
+    "/internal/schedule/generate-daily": {
+      "method": "POST",
+      "schedule": "0 0 * * *"
+    }
+  }
